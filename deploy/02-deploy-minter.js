@@ -6,8 +6,17 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     const { deploy, log } = deployments
     const { deployer } = await getNamedAccounts()
     log("------------------------")
+
+    let ethUsdPriceFeedAddress
+    if (developmentChains.includes(network.name)) {
+        const ethUsdAggregator = await deployments.get("MockV3Aggregator")
+        ethUsdPriceFeedAddress = ethUsdAggregator.address
+    } else {
+        ethUsdPriceFeedAddress = networkConfig[chainId]["ethUsdPriceFeed"]
+    }
+
     const generals = await ethers.getContract("VerdomiGenerals")
-    const args = [generals.address]
+    const args = [generals.address, ethUsdPriceFeedAddress]
     const minter = await deploy("GeneralMinter", {
         from: deployer,
         args: args,

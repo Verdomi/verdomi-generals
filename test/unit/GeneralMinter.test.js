@@ -15,12 +15,13 @@ const { developmentChains } = require("../../helper-hardhat-config")
               minter = await ethers.getContract("GeneralMinter")
               basicNft = await ethers.getContract("BasicNft")
               generals = await ethers.getContract("VerdomiGenerals")
+              mockV3Aggregator = await ethers.getContract("MockV3Aggregator", deployer)
           })
 
-          describe("Price", () => {
-              it("Initilizes the price correctly", async () => {
-                  const price = await minter.price()
-                  assert.equal(price.toString(), ethers.utils.parseEther("0.01").toString())
+          describe("Constructor", () => {
+              it("Sets the aggregator addresses correctly", async () => {
+                  const response = await minter.getPriceFeed()
+                  assert.equal(response, mockV3Aggregator.address)
               })
           })
 
@@ -51,14 +52,37 @@ const { developmentChains } = require("../../helper-hardhat-config")
               it("Reverts if not enough funds.", async () => {
                   await generals.addAllowed(minter.address)
                   await expect(
-                      minter.mintGeneral(5, { value: ethers.utils.parseEther("0.01") })
-                  ).to.be.revertedWith("GeneralMinter__NotEnoughFunds")
+                      minter.mintGeneral(5, { value: ethers.utils.parseEther("0.001") })
+                  ).to.be.revertedWith("Insufficent amount of ETH.")
               })
               it("Mints if funds are correct.", async () => {
                   await generals.addAllowed(minter.address)
-                  await minter.mintGeneral(5, { value: ethers.utils.parseEther("0.05") })
+                  await minter.mintGeneral(5, { value: ethers.utils.parseEther("1") })
                   const balance = await generals.balanceOf(deployer.address)
                   assert.equal(balance.toString(), "5")
+              })
+              it("Refunds eth if too much.", async () => {
+                  await generals.addAllowed(minter.address)
+                  const amount = 1
+
+                  const deployerBalanceBefore = await ethers.provider.getBalance(deployer.address)
+
+                  const txResponse = await minter.mintGeneral(amount, {
+                      value: ethers.utils.parseEther("1"),
+                  })
+                  const transactionReceipt = await txResponse.wait(1)
+                  const { gasUsed, effectiveGasPrice } = transactionReceipt
+                  const gasCost = gasUsed.mul(effectiveGasPrice)
+                  const deployerBalanceAfter = await ethers.provider.getBalance(deployer.address)
+                  const contractBalanceAfter = await ethers.provider.getBalance(minter.address)
+
+                  const price = await minter.priceInEth()
+
+                  assert(
+                      deployerBalanceAfter.add(gasCost).toString() ==
+                          deployerBalanceBefore.sub(price * amount).toString()
+                  )
+                  assert(contractBalanceAfter == price * amount)
               })
           })
 

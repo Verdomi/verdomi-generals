@@ -4,6 +4,9 @@ pragma solidity ^0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./IERC721A.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "./PriceConverter.sol";
 
 error GeneralMinter__CollectionNotEligible();
 error GeneralMinter__AllPersonalFreeMintsClaimed();
@@ -17,19 +20,22 @@ interface VerodmiGenerals {
     function mintGeneral(address to, uint256 quantity) external;
 }
 
-contract GeneralMinter is Ownable {
-    VerodmiGenerals immutable generals;
-    address immutable i_generalsAddress;
-    uint256 constant PRICE = 0.01 ether;
+contract GeneralMinter is Ownable, ReentrancyGuard {
+    using PriceConverter for uint256;
+
+    VerodmiGenerals internal immutable i_generals;
+    AggregatorV3Interface internal immutable i_priceFeed;
+
+    uint256 constant USD_PRICE = 9 * 10**18;
 
     mapping(address => bool) private freeMintCollections;
     mapping(address => uint8) private numberOfFreeMints;
 
     uint256 private s_amountFreeClaims = 0;
 
-    constructor(address generalContract) {
-        generals = VerodmiGenerals(generalContract);
-        i_generalsAddress = generalContract;
+    constructor(address generalContract, address priceFeedAddress) {
+        i_generals = VerodmiGenerals(generalContract);
+        i_priceFeed = AggregatorV3Interface(priceFeedAddress);
     }
 
     function claimFreeMint(uint8 amount, address freeMintAddress) external {
@@ -62,14 +68,24 @@ contract GeneralMinter is Ownable {
             s_amountFreeClaims += amount;
         }
         numberOfFreeMints[msg.sender] += amount;
-        generals.mintGeneral(msg.sender, amount);
+        i_generals.mintGeneral(msg.sender, amount);
     }
 
-    function mintGeneral(uint256 amount) external payable {
-        if (msg.value < amount * PRICE) {
-            revert GeneralMinter__NotEnoughFunds();
+    function mintGeneral(uint256 amount) external payable nonReentrant {
+        require(
+            msg.value.getConversionRate(i_priceFeed) >= USD_PRICE * amount,
+            "Insufficent amount of ETH."
+        );
+        i_generals.mintGeneral(msg.sender, amount);
+        // Sent back remaining ETH
+        if (msg.value.getConversionRate(i_priceFeed) > USD_PRICE * amount) {
+            uint256 costInUsd = USD_PRICE * amount;
+
+            uint256 costInEth = costInUsd.getEthAmountFromUsd(i_priceFeed);
+            uint256 remainingEth = (msg.value - costInEth);
+            (bool callSuccess, ) = payable(msg.sender).call{value: remainingEth}("");
+            require(callSuccess, "Refund failed");
         }
-        generals.mintGeneral(msg.sender, amount);
     }
 
     function addFreeMintCollection(address contractAddress) external onlyOwner {
@@ -93,7 +109,11 @@ contract GeneralMinter is Ownable {
         return freeMintCollections[contractAddress];
     }
 
-    function price() external pure returns (uint256) {
-        return PRICE;
+    function priceInEth() external view returns (uint256) {
+        return USD_PRICE.getEthAmountFromUsd(i_priceFeed);
+    }
+
+    function getPriceFeed() public view returns (AggregatorV3Interface) {
+        return i_priceFeed;
     }
 }

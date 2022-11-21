@@ -36,10 +36,15 @@ const networkConfig = {
 
 const INITIAL_SUPPLY = "1000000" // 1,000,000
 
+const DECIMALS = 8
+const INITIAL_ANSWER = 109968000000
+
 const developmentChains = ["hardhat", "localhost"]
 
 module.exports = {
     networkConfig,
     developmentChains,
     INITIAL_SUPPLY,
+    DECIMALS,
+    INITIAL_ANSWER,
 }
