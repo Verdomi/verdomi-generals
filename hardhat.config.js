@@ -22,6 +22,9 @@ const POLYGON_MAINNET_RPC_URL =
 const PRIVATE_KEY = process.env.PRIVATE_KEY
 const GOERLI_RPC_URL =
     process.env.GOERLI_RPC_URL || "https://eth-goerli.alchemyapi.io/v2/your-api-key"
+
+const SEPOLIA_RPC_URL =
+    process.env.SEPOLIA_RPC_URL || "https://polygon-mainnet.alchemyapi.io/v2/your-api-key"
 // optional
 const MNEMONIC = process.env.MNEMONIC || "your mnemonic"
 
@@ -68,6 +71,12 @@ module.exports = {
             chainId: 5,
             blockConfirmations: 6,
         },
+        sepolia: {
+            url: SEPOLIA_RPC_URL,
+            accounts: [PRIVATE_KEY],
+            chainId: 11155111,
+            blockConfirmations: 6,
+        },
         mainnet: {
             url: MAINNET_RPC_URL,
             accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
@@ -92,6 +101,7 @@ module.exports = {
             goerli: ETHERSCAN_API_KEY,
             mainnet: ETHERSCAN_API_KEY,
             polygon: POLYGONSCAN_API_KEY,
+            sepolia: ETHERSCAN_API_KEY,
         },
     },
     gasReporter: {
