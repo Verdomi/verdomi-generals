@@ -139,6 +139,70 @@ const { developmentChains } = require("../../helper-hardhat-config")
                   assert.equal(before.toString(), "false")
               })
           })
+
+          describe("setApprovalForAll", () => {
+              it("Reverts if less than 2000 minted.", async () => {
+                  await generals.addAllowed(deployer.address)
+                  await generals.mintGeneral(deployer.address, 1)
+                  await expect(generals.setApprovalForAll(player.address, true)).to.be.revertedWith(
+                      "VerdomiGenerals__NotEnoughMinted"
+                  )
+              })
+              it("Works if 2000 minted.", async () => {
+                  await generals.addAllowed(deployer.address)
+                  await generals.mintGeneral(deployer.address, 100)
+                  await expect(generals.setApprovalForAll(player.address, true)).to.be.revertedWith(
+                      "VerdomiGenerals__NotEnoughMinted"
+                  )
+                  await generals.mintGeneral(deployer.address, 1900)
+                  await generals.setApprovalForAll(player.address, true)
+                  const bool = await generals.isApprovedForAll(deployer.address, player.address)
+                  assert.equal(bool.toString(), "true")
+              })
+              it("Works with above 2000 minted.", async () => {
+                  await generals.addAllowed(deployer.address)
+                  await generals.mintGeneral(deployer.address, 2000)
+                  await generals.nextStage()
+                  await generals.mintGeneral(deployer.address, 10)
+                  await generals.setApprovalForAll(player.address, true)
+                  const bool = await generals.isApprovedForAll(deployer.address, player.address)
+                  assert.equal(bool.toString(), "true")
+              })
+          })
+
+          describe("approve", () => {
+              it("Reverts if less than 2000 minted.", async () => {
+                  await generals.addAllowed(deployer.address)
+                  await generals.mintGeneral(deployer.address, 1)
+                  await expect(generals.approve(player.address, 0)).to.be.revertedWith(
+                      "VerdomiGenerals__NotEnoughMinted"
+                  )
+              })
+              it("Works if 2000 minted.", async () => {
+                  await generals.addAllowed(deployer.address)
+                  await generals.mintGeneral(deployer.address, 100)
+                  await expect(generals.approve(player.address, 0)).to.be.revertedWith(
+                      "VerdomiGenerals__NotEnoughMinted"
+                  )
+                  await generals.mintGeneral(deployer.address, 1900)
+                  await generals.approve(player.address, 0)
+                  const playerConnectedGenerals = generals.connect(player)
+                  await expect(
+                      playerConnectedGenerals.transferFrom(deployer.address, player.address, 0)
+                  ).to.emit(generals, "Transfer")
+              })
+              it("Works with above 2000 minted.", async () => {
+                  await generals.addAllowed(deployer.address)
+                  await generals.mintGeneral(deployer.address, 2000)
+                  await generals.nextStage()
+                  await generals.mintGeneral(deployer.address, 10)
+                  await generals.approve(player.address, 0)
+                  const playerConnectedGenerals = generals.connect(player)
+                  await expect(
+                      playerConnectedGenerals.transferFrom(deployer.address, player.address, 0)
+                  ).to.emit(generals, "Transfer")
+              })
+          })
       })
 
 /*

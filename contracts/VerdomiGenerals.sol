@@ -72,17 +72,12 @@ contract VerdomiGenerals is ERC721A, AllowedAddresses {
     // =============================================================
     //                       APPROVAL FUNCTIONS
     // =============================================================
-    function setApprovalForAll(address operator, bool approved)
-        public
-        virtual
-        override
-        minimumMints
-    {
+    function setApprovalForAll(address operator, bool approved) public override minimumMints {
         _operatorApprovals[_msgSenderERC721A()][operator] = approved;
         emit ApprovalForAll(_msgSenderERC721A(), operator, approved);
     }
 
-    function approve(address to, uint256 tokenId) public payable virtual override minimumMints {
+    function approve(address to, uint256 tokenId) public payable override minimumMints {
         _approve(to, tokenId, true);
     }
 
