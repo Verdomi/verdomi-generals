@@ -7,6 +7,7 @@ import "./IERC721A.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./PriceConverter.sol";
+import "./IDelegationRegistry.sol";
 
 error GeneralMinter__CollectionNotEligible();
 error GeneralMinter__AllPersonalFreeMintsClaimed();
@@ -15,6 +16,7 @@ error GeneralMinter__NftBalanceTooLow();
 error GeneralMinter__NoContractsAllowed();
 error GeneralMinter__NotEnoughFunds();
 error GeneralMinter__TransferFailed();
+error GeneralMinter__NotDelegated();
 
 interface VerodmiGenerals {
     function mintGeneral(address to, uint256 quantity) external;
@@ -25,32 +27,43 @@ contract GeneralMinter is Ownable, ReentrancyGuard {
 
     VerodmiGenerals internal immutable i_generals;
     AggregatorV3Interface internal immutable i_priceFeed;
+    IDelegationRegistry internal immutable i_delegate;
 
     uint256 constant USD_PRICE = 9 * 10**18;
 
     mapping(address => bool) private freeMintCollections;
-    mapping(address => uint8) private numberOfFreeMints;
+    mapping(address => uint256) private numberOfFreeMints;
 
     uint256 private s_amountFreeClaims = 0;
+    uint256 private s_maxFreeClaims = 3;
 
-    constructor(address generalContract, address priceFeedAddress) {
+    constructor(
+        address generalContract,
+        address priceFeedAddress,
+        address delegateContract
+    ) {
         i_generals = VerodmiGenerals(generalContract);
         i_priceFeed = AggregatorV3Interface(priceFeedAddress);
+        i_delegate = IDelegationRegistry(delegateContract);
     }
 
-    function claimFreeMint(uint8 amount, address freeMintAddress) external {
+    function claimFreeMint(
+        uint256 amount,
+        address freeMintAddress,
+        address vaultAddress
+    ) external {
         // Collection must be allowed to claim a free General
         if (!freeMintCollections[freeMintAddress]) {
             revert GeneralMinter__CollectionNotEligible();
         }
 
         // Sender can at max claim 3 free mints
-        if (numberOfFreeMints[msg.sender] + amount > 3) {
+        if (numberOfFreeMints[msg.sender] + amount > s_maxFreeClaims) {
             revert GeneralMinter__AllPersonalFreeMintsClaimed();
         }
 
-        // Less than 1500 must have been claimed for free
-        if (s_amountFreeClaims + amount >= 1500) {
+        // Only less than or equal to 1500 can been claimed for free
+        if (s_amountFreeClaims + amount > 1500) {
             revert GeneralMinter__AllGeneralFreeMintsClaimed();
         }
 
@@ -61,9 +74,30 @@ contract GeneralMinter is Ownable, ReentrancyGuard {
 
         // Sender must own NFT from the free mint collection
         IERC721A nft = IERC721A(freeMintAddress);
-        if (!(nft.balanceOf(msg.sender) > 0)) {
-            revert GeneralMinter__NftBalanceTooLow();
+
+        // If sender is using the delegate contract
+        if (vaultAddress != (address(0))) {
+            // Check that they are in fact delegated
+            if (i_delegate.checkDelegateForContract(msg.sender, vaultAddress, freeMintAddress)) {
+                // Check that the vault owns the NFT, and if not, revert
+                if (!(nft.balanceOf(vaultAddress) > 0)) {
+                    revert GeneralMinter__NftBalanceTooLow();
+                }
+
+                // If they are not delegated, revert
+            } else {
+                revert GeneralMinter__NotDelegated();
+            }
+
+            // If sender is not using delegate contract
+        } else {
+            // Check if sender themselves own NFT, and if not, revert
+            if (!(nft.balanceOf(msg.sender) > 0)) {
+                revert GeneralMinter__NftBalanceTooLow();
+            }
         }
+
+        // If it hasn't reverted by now then the user is allowed to mint.
         unchecked {
             s_amountFreeClaims += amount;
         }
@@ -96,6 +130,10 @@ contract GeneralMinter is Ownable, ReentrancyGuard {
         freeMintCollections[contractAddress] = false;
     }
 
+    function setMaxFreeClaims(uint256 amount) external onlyOwner {
+        s_maxFreeClaims = amount;
+    }
+
     function withdrawFunds() external onlyOwner {
         (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
         if (!success) {
@@ -115,5 +153,9 @@ contract GeneralMinter is Ownable, ReentrancyGuard {
 
     function getPriceFeed() public view returns (AggregatorV3Interface) {
         return i_priceFeed;
+    }
+
+    function getMaxFreeClaims() public view returns (uint256) {
+        return s_maxFreeClaims;
     }
 }

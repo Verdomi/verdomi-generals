@@ -42,7 +42,7 @@ contract VerdomiGenerals is ERC721A, AllowedAddresses {
         if (_nextTokenId() + quantity > maxSupply()) {
             revert VerdomiGenerals__ExceedsMaxSupply();
         }
-        _safeMint(to, quantity);
+        _mint(to, quantity);
     }
 
     function nextStage() external onlyOwner {

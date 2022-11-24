@@ -16,6 +16,8 @@ const { developmentChains } = require("../../helper-hardhat-config")
               basicNft = await ethers.getContract("BasicNft")
               generals = await ethers.getContract("VerdomiGenerals")
               mockV3Aggregator = await ethers.getContract("MockV3Aggregator", deployer)
+              mockDelegationRegistry = await ethers.getContract("MockDelegationRegistry", deployer)
+              zeroAddress = "0x0000000000000000000000000000000000000000"
           })
 
           describe("Constructor", () => {
@@ -27,24 +29,88 @@ const { developmentChains } = require("../../helper-hardhat-config")
 
           describe("claimFreeMint", () => {
               it("Reverts if collection is not allowed to claim a free general.", async () => {
-                  await expect(minter.claimFreeMint(3, deployer.address)).to.be.revertedWith(
-                      "GeneralMinter__CollectionNotEligible"
-                  )
+                  await expect(
+                      minter.claimFreeMint(3, deployer.address, zeroAddress)
+                  ).to.be.revertedWith("GeneralMinter__CollectionNotEligible")
               })
               it("Reverts if sender does not own the NFT.", async () => {
                   await minter.addFreeMintCollection(basicNft.address)
-                  await expect(minter.claimFreeMint(1, basicNft.address)).to.be.revertedWith(
-                      "GeneralMinter__NftBalanceTooLow"
-                  )
+                  await expect(
+                      minter.claimFreeMint(1, basicNft.address, zeroAddress)
+                  ).to.be.revertedWith("GeneralMinter__NftBalanceTooLow")
               })
               it("Reverts if sender already has minted all free NFTs.", async () => {
                   await minter.addFreeMintCollection(basicNft.address)
                   await generals.addAllowed(minter.address)
                   await basicNft.mintNft()
-                  await minter.claimFreeMint(3, basicNft.address)
-                  await expect(minter.claimFreeMint(1, basicNft.address)).to.be.revertedWith(
-                      "GeneralMinter__AllPersonalFreeMintsClaimed"
-                  )
+                  await minter.claimFreeMint(3, basicNft.address, zeroAddress)
+                  await expect(
+                      minter.claimFreeMint(1, basicNft.address, zeroAddress)
+                  ).to.be.revertedWith("GeneralMinter__AllPersonalFreeMintsClaimed")
+              })
+              it("Reverts if it causes over 1500 to be claimed for free.", async () => {
+                  await minter.setMaxFreeClaims(1505)
+                  await generals.addAllowed(minter.address)
+                  await basicNft.mintNft()
+                  await minter.addFreeMintCollection(basicNft.address)
+                  await minter.claimFreeMint(5, basicNft.address, zeroAddress)
+                  await expect(
+                      minter.claimFreeMint(1500, basicNft.address, zeroAddress)
+                  ).to.be.revertedWith("GeneralMinter__AllGeneralFreeMintsClaimed")
+              })
+              it("Reverts if using delegate but not delegated", async () => {
+                  await minter.addFreeMintCollection(basicNft.address)
+                  await generals.addAllowed(minter.address)
+                  await expect(
+                      minter.claimFreeMint(3, basicNft.address, player.address)
+                  ).to.be.revertedWith("GeneralMinter__NotDelegated")
+              })
+              it("Reverts if delegated but vault does not own NFT", async () => {
+                  await minter.addFreeMintCollection(basicNft.address)
+                  await generals.addAllowed(minter.address)
+
+                  const playerDR = mockDelegationRegistry.connect(player)
+                  await playerDR.delegateForAll(deployer.address, true)
+
+                  await expect(
+                      minter.claimFreeMint(3, basicNft.address, player.address)
+                  ).to.be.revertedWith("GeneralMinter__NftBalanceTooLow")
+              })
+              it("Successfully mints using delegate", async () => {
+                  await minter.addFreeMintCollection(basicNft.address)
+                  await generals.addAllowed(minter.address)
+
+                  const playerDR = mockDelegationRegistry.connect(player)
+                  await playerDR.delegateForAll(deployer.address, true)
+
+                  const playerNFT = basicNft.connect(player)
+                  await playerNFT.mintNft()
+
+                  await minter.claimFreeMint(3, basicNft.address, player.address)
+                  const balance = await generals.balanceOf(deployer.address)
+                  assert.equal(balance.toString(), "3")
+              })
+              it("Successfully mints without delagate", async () => {
+                  await minter.addFreeMintCollection(basicNft.address)
+                  await generals.addAllowed(minter.address)
+                  await basicNft.mintNft()
+                  await minter.claimFreeMint(3, basicNft.address, zeroAddress)
+                  const balance = await generals.balanceOf(deployer.address)
+                  assert.equal(balance.toString(), "3")
+              })
+          })
+
+          describe("setMaxFreeClaims", () => {
+              it("Reverts if not owner.", async () => {
+                  const playerMinter = minter.connect(player)
+                  await expect(playerMinter.setMaxFreeClaims(3)).to.be.reverted
+              })
+              it("Sets the max free claims correctly", async () => {
+                  const before = await minter.getMaxFreeClaims()
+                  await minter.setMaxFreeClaims(20)
+                  const after = await minter.getMaxFreeClaims()
+                  assert.equal(before.toString(), "3")
+                  assert.equal(after.toString(), "20")
               })
           })
 
@@ -90,9 +156,9 @@ const { developmentChains } = require("../../helper-hardhat-config")
               it("removes the collection", async () => {
                   await minter.addFreeMintCollection(basicNft.address)
                   await minter.removeFreeMintCollection(basicNft.address)
-                  await expect(minter.claimFreeMint(3, deployer.address)).to.be.revertedWith(
-                      "GeneralMinter__CollectionNotEligible"
-                  )
+                  await expect(
+                      minter.claimFreeMint(3, deployer.address, zeroAddress)
+                  ).to.be.revertedWith("GeneralMinter__CollectionNotEligible")
               })
               it("Reverts if not owner", async () => {
                   const playerMinter = minter.connect(player)

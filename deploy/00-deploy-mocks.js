@@ -14,6 +14,12 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
             log: true,
             args: [DECIMALS, INITIAL_ANSWER],
         })
+        await deploy("MockDelegationRegistry", {
+            contract: "MockDelegationRegistry",
+            from: deployer,
+            log: true,
+            args: [],
+        })
         log("Mocks deployed!")
         log("---------------------------------")
     }
