@@ -29,7 +29,7 @@ contract GeneralMinter is Ownable, ReentrancyGuard {
     AggregatorV3Interface internal immutable i_priceFeed;
     IDelegationRegistry internal immutable i_delegate;
 
-    uint256 constant USD_PRICE = 9 * 10**18;
+    uint256 constant USD_PRICE = 9 * 10 ** 18;
 
     mapping(address => bool) private freeMintCollections;
     mapping(address => uint256) private numberOfFreeMints;
@@ -37,21 +37,13 @@ contract GeneralMinter is Ownable, ReentrancyGuard {
     uint256 private s_amountFreeClaims = 0;
     uint256 private s_maxFreeClaims = 3;
 
-    constructor(
-        address generalContract,
-        address priceFeedAddress,
-        address delegateContract
-    ) {
+    constructor(address generalContract, address priceFeedAddress, address delegateContract) {
         i_generals = VerodmiGenerals(generalContract);
         i_priceFeed = AggregatorV3Interface(priceFeedAddress);
         i_delegate = IDelegationRegistry(delegateContract);
     }
 
-    function claimFreeMint(
-        uint256 amount,
-        address freeMintAddress,
-        address vaultAddress
-    ) external {
+    function claimFreeMint(uint256 amount, address freeMintAddress, address vaultAddress) external {
         // Collection must be allowed to claim a free General
         if (!freeMintCollections[freeMintAddress]) {
             revert GeneralMinter__CollectionNotEligible();

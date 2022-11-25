@@ -83,16 +83,16 @@ const { developmentChains } = require("../../helper-hardhat-config")
           describe("setBaseURI", () => {
               it("Reverts if not owner.", async () => {
                   const playerConnectedGenerals = generals.connect(player)
-                  await expect(playerConnectedGenerals.setBaseURI("hello")).to.be.reverted
+                  await expect(playerConnectedGenerals.setBaseURI("hello", 0)).to.be.reverted
               })
               it("Reverts if BaseUri is frozen.", async () => {
-                  await generals.setBaseURI("hello")
+                  await generals.setBaseURI("hello", 10000)
                   await generals.nextStage()
                   await generals.nextStage()
                   await generals.nextStage()
                   await generals.nextStage()
                   await generals.freezeBaseURI()
-                  await expect(generals.setBaseURI("goodbye")).to.be.revertedWith(
+                  await expect(generals.setBaseURI("goodbye", 0)).to.be.revertedWith(
                       "VerdomiGenerals__BaseUriIsFrozen"
                   )
               })
@@ -100,9 +100,9 @@ const { developmentChains } = require("../../helper-hardhat-config")
                   await generals.addAllowed(deployer.address)
                   await generals.mintGeneral(deployer.address, 1)
                   const before = await generals.tokenURI(0)
-                  await generals.setBaseURI("hello")
+                  await generals.setBaseURI("hello", 0)
                   const after = await generals.tokenURI(0)
-                  await generals.setBaseURI("goodbye")
+                  await generals.setBaseURI("goodbye", 0)
                   const afterAgain = await generals.tokenURI(0)
                   assert.equal(before.toString(), "")
                   assert.equal(after.toString(), "hello0")
@@ -133,74 +133,62 @@ const { developmentChains } = require("../../helper-hardhat-config")
                   )
                   await generals.nextStage()
                   const before = await generals.uriFrozen()
+                  await generals.setBaseURI("hello", 10000)
                   await generals.freezeBaseURI()
                   const isFrozen = await generals.uriFrozen()
                   assert.equal(isFrozen.toString(), "true")
                   assert.equal(before.toString(), "false")
               })
-          })
-
-          describe("setApprovalForAll", () => {
-              it("Reverts if less than 2000 minted.", async () => {
-                  await generals.addAllowed(deployer.address)
-                  await generals.mintGeneral(deployer.address, 1)
-                  await expect(generals.setApprovalForAll(player.address, true)).to.be.revertedWith(
-                      "VerdomiGenerals__NotEnoughMinted"
-                  )
-              })
-              it("Works if 2000 minted.", async () => {
-                  await generals.addAllowed(deployer.address)
-                  await generals.mintGeneral(deployer.address, 100)
-                  await expect(generals.setApprovalForAll(player.address, true)).to.be.revertedWith(
-                      "VerdomiGenerals__NotEnoughMinted"
-                  )
-                  await generals.mintGeneral(deployer.address, 1900)
-                  await generals.setApprovalForAll(player.address, true)
-                  const bool = await generals.isApprovedForAll(deployer.address, player.address)
-                  assert.equal(bool.toString(), "true")
-              })
-              it("Works with above 2000 minted.", async () => {
-                  await generals.addAllowed(deployer.address)
-                  await generals.mintGeneral(deployer.address, 2000)
+              it("Correctly freezes the BaseURI.", async () => {
+                  await generals.setBaseURI("hello", 10000)
                   await generals.nextStage()
-                  await generals.mintGeneral(deployer.address, 10)
-                  await generals.setApprovalForAll(player.address, true)
-                  const bool = await generals.isApprovedForAll(deployer.address, player.address)
-                  assert.equal(bool.toString(), "true")
+                  await generals.nextStage()
+                  await generals.nextStage()
+                  await generals.nextStage()
+                  await generals.freezeBaseURI()
+                  await expect(generals.setBaseURI("goodbye", 0)).to.be.revertedWith(
+                      "VerdomiGenerals__BaseUriIsFrozen"
+                  )
+              })
+              it("Correctly freezes the revealedUnitl.", async () => {
+                  await generals.setBaseURI("hello", 10000)
+                  const before = await generals.revealedUntil()
+                  await generals.nextStage()
+                  await generals.nextStage()
+                  await generals.nextStage()
+                  await generals.nextStage()
+                  await generals.freezeBaseURI()
+                  await expect(generals.setBaseURI("goodbye", 0)).to.be.revertedWith(
+                      "VerdomiGenerals__BaseUriIsFrozen"
+                  )
+                  const after = await generals.revealedUntil()
+                  assert.equal(before.toString(), after.toString())
               })
           })
 
-          describe("approve", () => {
-              it("Reverts if less than 2000 minted.", async () => {
+          describe("TokenURI", () => {
+              it("Returns unrevealedURI if not revealed", async () => {
                   await generals.addAllowed(deployer.address)
-                  await generals.mintGeneral(deployer.address, 1)
-                  await expect(generals.approve(player.address, 0)).to.be.revertedWith(
-                      "VerdomiGenerals__NotEnoughMinted"
-                  )
+                  await generals.mintGeneral(deployer.address, 2)
+                  await generals.setUnrevealedURI("unrevealed")
+                  const tokenOneUri = await generals.tokenURI(1)
+                  assert.equal(tokenOneUri.toString(), "unrevealed")
               })
-              it("Works if 2000 minted.", async () => {
+              it("Returns BaseURI + tokenId if revealed", async () => {
                   await generals.addAllowed(deployer.address)
-                  await generals.mintGeneral(deployer.address, 100)
-                  await expect(generals.approve(player.address, 0)).to.be.revertedWith(
-                      "VerdomiGenerals__NotEnoughMinted"
-                  )
-                  await generals.mintGeneral(deployer.address, 1900)
-                  await generals.approve(player.address, 0)
-                  const playerConnectedGenerals = generals.connect(player)
-                  await expect(
-                      playerConnectedGenerals.transferFrom(deployer.address, player.address, 0)
-                  ).to.emit(generals, "Transfer")
-              })
-              it("Works with above 2000 minted.", async () => {
-                  await generals.addAllowed(deployer.address)
-                  await generals.mintGeneral(deployer.address, 2000)
-                  await generals.nextStage()
-                  await generals.mintGeneral(deployer.address, 10)
-                  await generals.approve(player.address, 0)
-                  const playerConnectedGenerals = generals.connect(player)
-                  await expect(
-                      playerConnectedGenerals.transferFrom(deployer.address, player.address, 0)
-                  ).to.emit(generals, "Transfer")
+                  await generals.mintGeneral(deployer.address, 2)
+                  await generals.setUnrevealedURI("unrevealed")
+                  await generals.setBaseURI("revealed/", 0)
+                  const tokenZeroUriBefore = await generals.tokenURI(0)
+                  const tokenOneUriBefore = await generals.tokenURI(1)
+                  await generals.setBaseURI("revealed/", 1)
+                  const tokenZeroUriAfter = await generals.tokenURI(0)
+                  const tokenOneUriAfter = await generals.tokenURI(1)
+
+                  assert.equal(tokenZeroUriBefore.toString(), "revealed/0")
+                  assert.equal(tokenZeroUriAfter.toString(), "revealed/0")
+                  assert.equal(tokenOneUriBefore.toString(), "unrevealed")
+                  assert.equal(tokenOneUriAfter.toString(), "revealed/1")
               })
           })
       })
