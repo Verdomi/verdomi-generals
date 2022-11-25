@@ -1,11 +1,23 @@
-const hre = require("hardhat")
-const { LedgerSigner } = require("@ethersproject/hardware-wallets")
+const Web3 = require("web3")
+const provider = require("eth-provider")
+
+const { ethers } = require("hardhat")
+
 async function main() {
-    let contractFactory = await hre.ethers.getContractFactory("VerdomiGenerals")
-    const ledger = await new LedgerSigner(contractFactory.signer.provider, "hid", "m/44'/60'/0'/0")
-    contractFactory = await contractFactory.connect(ledger)
-    const melk = await contractFactory.deploy()
-    await melk.deployed()
+    const ethProvider = require("eth-provider")
+    const frame = ethProvider("frame") // Connect to Frame
+
+    const factory = await ethers.getContractFactory("VerdomiGenerals")
+
+    const args = []
+
+    const tx = await factory.getDeployTransaction(args)
+    console.log(tx)
+
+    await frame.isConnected()
+
+    tx.from = (await frame.request({ method: "eth_requestAccounts" }))[0]
+    await frame.request({ method: "eth_sendTransaction", params: [tx] })
 }
 
 main()

@@ -381,11 +381,9 @@ contract ERC721A is IERC721A {
     /**
      * @dev Returns the unpacked `TokenOwnership` struct from `packed`.
      */
-    function _unpackedOwnership(uint256 packed)
-        private
-        pure
-        returns (TokenOwnership memory ownership)
-    {
+    function _unpackedOwnership(
+        uint256 packed
+    ) private pure returns (TokenOwnership memory ownership) {
         ownership.addr = address(uint160(packed));
         ownership.startTimestamp = uint64(packed >> _BITPOS_START_TIMESTAMP);
         ownership.burned = packed & _BITMASK_BURNED != 0;
@@ -395,11 +393,10 @@ contract ERC721A is IERC721A {
     /**
      * @dev Packs ownership data into a single uint256.
      */
-    function _packOwnershipData(address owner, uint256 flags)
-        private
-        view
-        returns (uint256 result)
-    {
+    function _packOwnershipData(
+        address owner,
+        uint256 flags
+    ) private view returns (uint256 result) {
         assembly {
             // Mask `owner` to the lower 160 bits, in case the upper bits somehow aren't clean.
             owner := and(owner, _BITMASK_ADDRESS)
@@ -430,7 +427,7 @@ contract ERC721A is IERC721A {
      *
      * - The caller must own the token or be an approved operator.
      */
-    function approve(address to, uint256 tokenId) public payable virtual override {
+    function approve(address to, uint256 tokenId) public virtual override {
         _approve(to, tokenId, true);
     }
 
@@ -468,13 +465,10 @@ contract ERC721A is IERC721A {
      *
      * See {setApprovalForAll}.
      */
-    function isApprovedForAll(address owner, address operator)
-        public
-        view
-        virtual
-        override
-        returns (bool)
-    {
+    function isApprovedForAll(
+        address owner,
+        address operator
+    ) public view virtual override returns (bool) {
         return _operatorApprovals[owner][operator];
     }
 
@@ -513,11 +507,9 @@ contract ERC721A is IERC721A {
     /**
      * @dev Returns the storage slot and value for the approved address of `tokenId`.
      */
-    function _getApprovedSlotAndAddress(uint256 tokenId)
-        private
-        view
-        returns (uint256 approvedAddressSlot, address approvedAddress)
-    {
+    function _getApprovedSlotAndAddress(
+        uint256 tokenId
+    ) private view returns (uint256 approvedAddressSlot, address approvedAddress) {
         TokenApprovalRef storage tokenApproval = _tokenApprovals[tokenId];
         // The following is equivalent to `approvedAddress = _tokenApprovals[tokenId].value`.
         assembly {
@@ -543,11 +535,7 @@ contract ERC721A is IERC721A {
      *
      * Emits a {Transfer} event.
      */
-    function transferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    ) public payable virtual override {
+    function transferFrom(address from, address to, uint256 tokenId) public virtual override {
         uint256 prevOwnershipPacked = _packedOwnershipOf(tokenId);
 
         if (address(uint160(prevOwnershipPacked)) != from) revert TransferFromIncorrectOwner();
@@ -612,11 +600,7 @@ contract ERC721A is IERC721A {
     /**
      * @dev Equivalent to `safeTransferFrom(from, to, tokenId, '')`.
      */
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    ) public payable virtual override {
+    function safeTransferFrom(address from, address to, uint256 tokenId) public virtual override {
         safeTransferFrom(from, to, tokenId, "");
     }
 
@@ -640,7 +624,7 @@ contract ERC721A is IERC721A {
         address to,
         uint256 tokenId,
         bytes memory _data
-    ) public payable virtual override {
+    ) public virtual override {
         transferFrom(from, to, tokenId);
         if (to.code.length != 0)
             if (!_checkContractOnERC721Received(from, to, tokenId, _data)) {
@@ -873,11 +857,7 @@ contract ERC721A is IERC721A {
      *
      * Emits a {Transfer} event for each mint.
      */
-    function _safeMint(
-        address to,
-        uint256 quantity,
-        bytes memory _data
-    ) internal virtual {
+    function _safeMint(address to, uint256 quantity, bytes memory _data) internal virtual {
         _mint(to, quantity);
 
         unchecked {
@@ -926,11 +906,7 @@ contract ERC721A is IERC721A {
      *
      * Emits an {Approval} event.
      */
-    function _approve(
-        address to,
-        uint256 tokenId,
-        bool approvalCheck
-    ) internal virtual {
+    function _approve(address to, uint256 tokenId, bool approvalCheck) internal virtual {
         address owner = ownerOf(tokenId);
 
         if (approvalCheck)
